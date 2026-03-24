@@ -123,7 +123,7 @@ impl Default for {{classname}} {
 {{^discriminator}}
 {{#vendorExtensions.x-rust-has-byte-array}}#[serde_as]
 {{/vendorExtensions.x-rust-has-byte-array}}{{#oneOf.isEmpty}}#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
-pub struct {{{classname}}} {
+pub struct {{{classname}}}{{#vendorExtensions.x-regions-lifetimes}}{{#-first}}<{{/-first}}'{{{.}}}{{^-last}}, {{/-last}}{{#-last}}>{{/-last}}{{/vendorExtensions.x-regions-lifetimes}} {
 {{#vars}}
     {{#description}}
     /// {{{.}}}
@@ -137,6 +137,8 @@ pub struct {{{classname}}} {
     }}{{#isNullable}}Option<{{/isNullable}}{{^required}}Option<{{/required}}{{!
     ### Enums
     }}{{#isEnum}}{{#isArray}}{{#uniqueItems}}std::collections::HashSet<{{/uniqueItems}}{{^uniqueItems}}Vec<{{/uniqueItems}}{{/isArray}}{{{enumName}}}{{#isArray}}>{{/isArray}}{{/isEnum}}{{!
+    ### Reference and lifetime annotation start
+    }}{{#vendorExtensions.x-regions-is-reference}}&'{{#vendorExtensions.x-regions-lifetime}}{{{.}}}{{/vendorExtensions.x-regions-lifetime}} {{/vendorExtensions.x-regions-is-reference}}{{!
     ### Non-Enums Start
     }}{{^isEnum}}{{!
     ### Models
@@ -150,11 +152,13 @@ pub struct {{{classname}}} {
 {{/vars}}
 }
 
-impl {{{classname}}} {
+impl{{#vendorExtensions.x-regions-lifetimes}}{{#-first}}<{{/-first}}'{{{.}}}{{^-last}}, {{/-last}}{{#-last}}>{{/-last}}{{/vendorExtensions.x-regions-lifetimes}} {{{classname}}}{{#vendorExtensions.x-regions-lifetimes}}{{#-first}}<{{/-first}}'{{{.}}}{{^-last}}, {{/-last}}{{#-last}}>{{/-last}}{{/vendorExtensions.x-regions-lifetimes}} {
     {{#description}}
     /// {{{.}}}
     {{/description}}
     pub fn new({{#requiredVars}}{{{name}}}: {{!
+    ### Reference and lifetime annotation start
+    }}{{#vendorExtensions.x-regions-is-reference}}&'{{#vendorExtensions.x-regions-lifetime}}{{{.}}}{{/vendorExtensions.x-regions-lifetime}} {{/vendorExtensions.x-regions-is-reference}}{{!
     ### Option Start
     }}{{#isNullable}}Option<{{/isNullable}}{{!
     ### Enums
@@ -164,7 +168,9 @@ impl {{{classname}}} {
     ### Option End
     }}{{#isNullable}}>{{/isNullable}}{{!
     ### Comma for next arguement
-    }}{{^-last}}, {{/-last}}{{/requiredVars}}) -> {{{classname}}} {
+    }}{{^-last}}, {{/-last}}{{/requiredVars}}) -> {{{classname}}}{{!
+    ### Reference and lifetime annotation start
+    }}{{#vendorExtensions.x-regions-lifetimes}}{{#-first}}<{{/-first}}'{{{.}}}{{^-last}}, {{/-last}}{{#-last}}>{{/-last}}{{/vendorExtensions.x-regions-lifetimes}} {
         {{{classname}}} {
             {{#vars}}
             {{{name}}}{{^required}}: None{{/required}}{{#required}}{{^isEnum}}{{#isModel}}{{^avoidBoxedModels}}: {{^isNullable}}Box::new({{{name}}}){{/isNullable}}{{#isNullable}}if let Some(x) = {{{name}}} {Some(Box::new(x))} else {None}{{/isNullable}}{{/avoidBoxedModels}}{{/isModel}}{{/isEnum}}{{/required}},

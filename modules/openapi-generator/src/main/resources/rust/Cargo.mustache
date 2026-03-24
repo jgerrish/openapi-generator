@@ -122,3 +122,27 @@ mockall = ["dep:mockall"]
 bon = ["dep:bon"]
 {{/useBonBuilder}}
 {{/reqwestTrait}}
+
+
+{{#reqwless}}
+embedded-nal = "0.9"
+embedded-nal-async = "0.9"
+{{#useNoStd}}
+heapless = { version = "^0.9", features = ["serde"] }
+{{/useNoStd}}
+# reqwless = "^0.13"
+reqwless = { version = "^0.14", path = "../../reqwless/reqwless" }
+# reqwless = { version = "^0.13", git = "https://github.com/jgerrish/reqwless.git", rev = "1ea223421a84fa7269f43938365194393302fdca" }
+{{#useAsyncFileStream}}
+tokio = { version = "^1.46.0", features = ["fs"] }
+tokio-util = { version = "^0.7", features = ["codec"] }
+{{/useAsyncFileStream}}
+{{#supportTokenSource}}
+async-trait = "^0.1"
+# TODO: propose to Yoshidan to externalize this as non google related crate, so that it can easily be extended for other cloud providers.
+google-cloud-token = "^0.1"
+{{/supportTokenSource}}
+
+# [features]
+# default = [{{#reqwlessDefaultFeatures}}"{{.}}"{{^-last}}, {{/-last}}{{/reqwlessDefaultFeatures}}]
+{{/reqwless}}

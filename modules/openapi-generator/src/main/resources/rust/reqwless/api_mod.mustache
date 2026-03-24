@@ -1,0 +1,249 @@
+{{^useNoStd}}
+use std::error;
+use std::fmt;
+{{/useNoStd}}
+{{#useNoStd}}
+use core::error;
+use core::fmt;
+extern crate alloc;
+use alloc::string::ToString;
+use heapless::{format, CapacityError, String, Vec};
+{{/useNoStd}}
+{{#withAWSV4Signature}}
+use aws_sigv4;
+{{/withAWSV4Signature}}
+
+
+#[derive(Debug, Clone)]
+pub struct ResponseContent<'response_content, T> {
+    pub status: reqwless::response::StatusCode,
+    pub content: &'response_content str,
+    pub entity: Option<T>,
+}
+
+#[derive(Debug)]
+pub enum Error<'error, T> {
+    Reqwless(reqwless::Error),
+    {{#supportMiddleware}}
+    ReqwlessMiddleware(reqwless_middleware::Error),
+    {{/supportMiddleware}}
+    Serde(serde_json::Error),
+    {{#useSerdePathToError}}
+    SerdePathToError(serde_path_to_error::Error<serde_json::Error>),
+    {{/useSerdePathToError}}
+    {{^useNoStd}}
+    Io(std::io::Error),
+    {{/useNoStd}}
+    {{#useNoStd}}
+    Io(&'error dyn error::Error),
+    {{/useNoStd}}
+    ResponseError(ResponseContent<'error, T>),
+    {{#withAWSV4Signature}}
+    AWSV4SignatureError(aws_sigv4::http_request::Error),
+    {{/withAWSV4Signature}}
+    {{#supportAsync}}
+    {{#supportTokenSource}}
+    {{#useNoStd}}
+    TokenSource(Box<dyn core::error::Error + Send + Sync>),
+    {{/useNoStd}}
+    {{^useNoStd}}
+    TokenSource(Box<dyn std::error::Error + Send + Sync>),
+    {{/useNoStd}}
+    {{/supportTokenSource}}
+    {{/supportAsync}}
+    {{#useNoStd}}
+    CapacityError(heapless::CapacityError),
+    Configuration(String<100>),
+    Fmt(core::fmt::Error),
+    {{/useNoStd}}
+}
+
+{{^useNoStd}}
+impl <T> fmt::Display for Error<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (module, e) = match self {
+            Error::Reqwless(e) => ("reqwless", format!("{:?}", e)),
+            {{#supportMiddleware}}
+            Error::ReqwlessMiddleware(e) => ("reqwless-middleware", e.to_string()),
+            {{/supportMiddleware}}
+            Error::Serde(e) => ("serde", e.to_string()),
+            {{#useSerdePathToError}}
+            Error::SerdePathToError(e) => ("serde", format!("{}: {}", e.path().to_string(), e.inner().to_string())),
+            {{/useSerdePathToError}}
+            Error::Io(e) => ("IO", e.to_string()),
+            Error::ResponseError(e) => ("response", format!("status code {:?}", e.status)),
+            {{#withAWSV4Signature}}
+            Error::AWSV4SignatureError(e) => ("aws v4 signature", e.to_string()),
+            {{/withAWSV4Signature}}
+            {{#supportAsync}}
+            {{#supportTokenSource}}
+            Error::TokenSource(e) => ("token source failure", e.to_string()),
+            {{/supportTokenSource}}
+            {{/supportAsync}}
+        };
+        write!(f, "error in {}: {:?}", module, e)
+    }
+}
+{{/useNoStd}}
+
+// impl <T: fmt::Debug> error::Error for Error<T> {
+//     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+//         Some(match self {
+//             Error::Reqwless(e) => e,
+//             {{#supportMiddleware}}
+//             Error::ReqwlessMiddleware(e) => e,
+//             {{/supportMiddleware}}
+//             Error::Serde(e) => e,
+//             {{#useSerdePathToError}}
+//             Error::SerdePathToError(e) => e,
+//             {{/useSerdePathToError}}
+//             Error::Io(e) => e,
+//             Error::ResponseError(_) => return None,
+//             {{#withAWSV4Signature}}
+//             Error::AWSV4SignatureError(_) => return None,
+//             {{/withAWSV4Signature}}
+//             {{#supportAsync}}
+//             {{#supportTokenSource}}
+//             Error::TokenSource(e) => &**e,
+//             {{/supportTokenSource}}
+//             {{/supportAsync}}
+//         })
+//     }
+// }
+
+impl <T> From<reqwless::Error> for Error<'_, T> {
+    fn from(e: reqwless::Error) -> Self {
+        Error::Reqwless(e)
+    }
+}
+{{#supportMiddleware}}
+impl<T> From<reqwless_middleware::Error> for Error<'_, T> {
+    fn from(e: reqwless_middleware::Error) -> Self {
+        Error::ReqwlessMiddleware(e)
+    }
+}
+{{/supportMiddleware}}
+
+impl <T> From<serde_json::Error> for Error<'_, T> {
+    fn from(e: serde_json::Error) -> Self {
+        Error::Serde(e)
+    }
+}
+
+{{#useSerdePathToError}}
+impl<T> From<serde_path_to_error::Error<serde_json::Error>> for Error<T> {
+    fn from(e: serde_path_to_error::Error<serde_json::Error>) -> Self {
+        Error::SerdePathToError(e)
+    }
+}
+
+{{/useSerdePathToError}}
+{{^useNoStd}}
+impl <T> From<std::io::Error> for Error<'_, T> {
+    fn from(e: std::io::Error) -> Self {
+        Error::Io(e)
+    }
+}
+pub fn urlencode<T: AsRef<str>>(s: T) -> String {
+    ::url::form_urlencoded::byte_serialize(s.as_ref().as_bytes()).collect()
+}
+{{/useNoStd}}
+{{#useNoStd}}
+impl <T> From<core::fmt::Error> for Error<'_, T> {
+    fn from(e: core::fmt::Error) -> Self {
+        Error::Fmt(e)
+    }
+}
+
+impl <T> From<CapacityError> for Error<'_, T> {
+    fn from(e: CapacityError) -> Self {
+        Error::CapacityError(e)
+    }
+}
+
+pub fn urlencode<T: AsRef<str>, N>(s: T) -> String<2048> {
+    ::url::form_urlencoded::byte_serialize(s.as_ref().as_bytes()).collect()
+}
+{{/useNoStd}}
+
+{{^useNoStd}}
+pub fn parse_deep_object(prefix: &str, value: &serde_json::Value) -> Vec<(String, String)> {
+    if let serde_json::Value::Object(object) = value {
+        let mut params = vec![];
+
+        for (key, value) in object {
+            match value {
+                serde_json::Value::Object(_) => params.append(&mut parse_deep_object(
+                    &format!("{}[{}]", prefix, key),
+                    value,
+                )),
+                serde_json::Value::Array(array) => {
+                    for (i, value) in array.iter().enumerate() {
+                        params.append(&mut parse_deep_object(
+                            &format!("{}[{}][{}]", prefix, key, i),
+                            value,
+                        ));
+                    }
+                },
+                serde_json::Value::String(s) => params.push((format!("{}[{}]", prefix, key), s.clone())),
+                _ => params.push((format!("{}[{}]", prefix, key), value.to_string())),
+            }
+        }
+
+        return params;
+    }
+
+    unimplemented!("Only objects are supported with style=deepObject")
+}
+{{/useNoStd}}
+
+/// Internal use only
+/// A content type supported by this client.
+#[allow(dead_code)]
+enum ContentType<'content_type> {
+    Json,
+    Text,
+    Unsupported(&'content_type str),
+}
+
+impl<'content_type> From<&'content_type str> for ContentType<'content_type> {
+    fn from(content_type: &'content_type str) -> Self {
+        if content_type.starts_with("application") && content_type.contains("json") {
+            return Self::Json;
+        } else if content_type.starts_with("text/plain") {
+            return Self::Text;
+        } else {
+            return Self::Unsupported(content_type);
+        }
+    }
+}
+
+impl From<reqwless::headers::ContentType> for ContentType<'_> {
+    fn from(content_type: reqwless::headers::ContentType) -> Self {
+	match content_type {
+	    reqwless::headers::ContentType::ApplicationJson => ContentType::Json,
+	    reqwless::headers::ContentType::TextPlain => ContentType::Text,
+	    _ => ContentType::Unsupported("Unsupported type"),
+	}
+    }
+}
+
+// TODO: Fix
+// This matching isn't good yet
+impl From<ContentType<'_>> for reqwless::headers::ContentType {
+    fn from(content_type: ContentType) -> Self {
+	match content_type {
+	    ContentType::Json => reqwless::headers::ContentType::ApplicationJson,
+	    ContentType::Text => reqwless::headers::ContentType::TextPlain,
+	    _ => reqwless::headers::ContentType::TextPlain,
+	}
+    }
+}
+
+{{#apiInfo}}
+{{#apis}}
+pub mod {{{classFilename}}};
+{{/apis}}
+{{/apiInfo}}
+
+pub mod configuration;

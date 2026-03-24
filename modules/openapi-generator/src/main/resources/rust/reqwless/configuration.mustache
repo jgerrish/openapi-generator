@@ -1,0 +1,135 @@
+{{>partial_header}}
+use embedded_nal_async::{Dns, TcpConnect};
+
+{{#withAWSV4Signature}}
+use std::time::SystemTime;
+use aws_sigv4::http_request::{sign, SigningSettings, SigningParams, SignableRequest};
+use http;
+use secrecy::{SecretString, ExposeSecret};
+{{/withAWSV4Signature}}
+{{#supportTokenSource}}
+use std::sync::Arc;
+use google_cloud_token::TokenSource;
+use async_trait::async_trait;
+{{/supportTokenSource}}
+
+pub const RX_BUF_SIZE: usize = 65536;
+
+// #[derive(Debug, Clone)]
+pub struct Configuration<'config, T: TcpConnect, D: Dns> {
+    pub base_path: &'config str,
+    pub user_agent: Option<&'config str>,
+    pub client: {{#supportMiddleware}}reqwless_middleware::ClientWithMiddleware{{/supportMiddleware}}{{^supportMiddleware}}reqwless::client::HttpClient<'config, T, D>{{/supportMiddleware}},
+      {{^supportTokenSource}}
+    pub basic_auth: Option<BasicAuth<'config>>,
+    pub oauth_access_token: Option<&'config str>,
+    pub bearer_access_token: Option<&'config str>,
+    pub api_key: Option<ApiKey<'config>>,
+    {{/supportTokenSource}}
+    {{#withAWSV4Signature}}
+    pub aws_v4_key: Option<&'config AWSv4Key>,
+    {{/withAWSV4Signature}}
+    {{#supportAsync}}
+    {{#supportTokenSource}}
+    pub token_source: Arc<dyn TokenSource>,
+    {{/supportTokenSource}}
+    {{/supportAsync}}
+}
+{{^supportTokenSource}}
+
+pub type BasicAuth<'auth> = (&'auth str, Option<&'auth str>);
+
+#[derive(Debug, Clone)]
+pub struct ApiKey<'apikey> {
+    pub prefix: Option<&'apikey str>,
+    pub key: &'apikey str,
+}
+{{/supportTokenSource}}
+
+{{#withAWSV4Signature}}
+#[derive(Debug, Clone)]
+pub struct AWSv4Key<'awskey> {
+    pub access_key: &'awskey str,
+    pub secret_key: SecretString,
+    pub region: &'awskey str,
+    pub service: &'awskey str,
+}
+
+impl AWSv4Key {
+    pub fn sign(&self, uri: &str, method: &str, body: &str) -> Result<Vec::<(String, String)>, aws_sigv4::http_request::Error> {
+	let request = http::Request::builder()
+	    .uri(uri)
+	    .method(method)
+	    .body(body).unwrap();
+	let signing_settings = SigningSettings::default();
+	let signing_params = SigningParams::builder()
+	    .access_key(self.access_key.as_str())
+	    .secret_key(self.secret_key.expose_secret().as_str())
+	    .region(self.region.as_str())
+	    .service_name(self.service.as_str())
+	    .time(SystemTime::now())
+	    .settings(signing_settings)
+	    .build()
+	    .unwrap();
+	let signable_request = SignableRequest::from(&request);
+	let (mut signing_instructions, _signature) = sign(signable_request, &signing_params)?.into_parts();
+	let mut additional_headers = Vec::<(String, String)>::new();
+	if let Some(new_headers) = signing_instructions.take_headers() {
+            for (name, value) in new_headers.into_iter() {
+		additional_headers.push((name.expect("header should have name").to_string(),
+		                         value.to_str().expect("header value should be a string").to_string()));
+            }
+        }
+	Ok(additional_headers)
+    }
+}
+{{/withAWSV4Signature}}
+
+impl<'config, T: TcpConnect, D: Dns> Configuration<'config, T, D> {
+    pub fn new(
+	base_path: &'config str,
+	user_agent: Option<&'config str>,
+	client: reqwless::client::HttpClient<'config, T, D>,
+        {{^supportTokenSource}}
+	basic_auth: Option<BasicAuth<'config>>,
+	oauth_access_token: Option<&'config str>,
+	bearer_access_token: Option<&'config str>,
+	api_key: Option<ApiKey<'config>>,
+        {{/supportTokenSource}}
+        {{#withAWSV4Signature}}
+        aws_v4_key: Option<AWSv4Key>,
+        {{/withAWSV4Signature}}
+        {{#supportTokenSource}}
+        token_source: Arc<dyn TokenSource>,
+        {{/supportTokenSource}}
+    ) -> Self {
+        Configuration {
+            base_path,
+            user_agent,
+            client,
+            {{^supportTokenSource}}
+            basic_auth,
+            oauth_access_token,
+            bearer_access_token,
+            api_key,
+            {{/supportTokenSource}}
+            {{#withAWSV4Signature}}
+            aws_v4_key,
+            {{/withAWSV4Signature}}
+            {{#supportTokenSource}}
+            token_source,
+            {{/supportTokenSource}}
+        }
+    }
+}
+{{#supportTokenSource}}
+#[derive(Debug)]
+struct NoopTokenSource{}
+
+#[async_trait]
+impl TokenSource for NoopTokenSource {
+    async fn token(&self) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        panic!("This is dummy token source. You can use TokenSourceProvider from 'google_cloud_auth' crate, or any other compatible crate.")
+    }
+}
+{{/supportTokenSource}}

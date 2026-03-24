@@ -1,0 +1,625 @@
+{{>partial_header}}
+
+use embedded_nal_async::{Dns, TcpConnect};
+{{#useNoStd}}
+use heapless::{format, String, Vec};
+{{/useNoStd}}
+use reqwless::{self, request::RequestBuilder};
+use serde::{Deserialize, Serialize, de::Error as _};
+use crate::{apis::ResponseContent, models};
+use super::{Error, configuration, ContentType};
+{{#operations}}
+{{#operation}}
+{{#vendorExtensions.useAsyncFileStream}}
+use tokio::fs::File as TokioFile;
+use tokio_util::codec::{BytesCodec, FramedRead};
+{{/vendorExtensions.useAsyncFileStream}}
+{{/operation}}
+{{/operations}}
+
+{{#operations}}
+{{#operation}}
+{{#vendorExtensions.x-group-parameters}}
+{{#allParams}}
+{{#-first}}
+/// struct for passing parameters to the method [`{{operationId}}`]
+#[derive(Clone, Debug)]
+pub struct {{{operationIdCamelCase}}}Params {
+{{/-first}}
+    {{#description}}
+    /// {{{.}}}
+    {{/description}}
+    pub {{{paramName}}}: {{!
+    ### Option Start
+    }}{{^required}}Option<{{/required}}{{#required}}{{#isNullable}}Option<{{/isNullable}}{{/required}}{{!
+    ### &str and Vec<&str>
+    }}{{^isUuid}}{{#isString}}{{#isArray}}Vec<{{/isArray}}String{{#isArray}}>{{/isArray}}{{/isString}}{{/isUuid}}{{!
+    ### UUIDs
+    }}{{#isUuid}}{{#isArray}}Vec<{{/isArray}}String{{#isArray}}>{{/isArray}}{{/isUuid}}{{!
+    ### Models and primative types
+    }}{{^isString}}{{^isUuid}}{{^isPrimitiveType}}{{^isContainer}}models::{{/isContainer}}{{/isPrimitiveType}}{{{dataType}}}{{/isUuid}}{{/isString}}{{!
+    ### Option End
+    }}{{^required}}>{{/required}}{{#required}}{{#isNullable}}>{{/isNullable}}{{/required}}{{!
+    ### Comma for next arguement
+    }}{{^-last}},{{/-last}}
+{{#-last}}
+}
+
+{{/-last}}
+{{/allParams}}
+{{/vendorExtensions.x-group-parameters}}
+{{/operation}}
+{{/operations}}
+
+{{#supportMultipleResponses}}
+{{#operations}}
+{{#operation}}
+/// struct for typed successes of method [`{{operationId}}`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum {{{operationIdCamelCase}}}Success {
+    {{#responses}}
+    {{#is2xx}}
+    Status{{code}}({{#isEnum}}{{{enumName}}}{{/isEnum}}{{^isEnum}}{{{dataType}}}{{/isEnum}}),
+    {{/is2xx}}
+    {{#is3xx}}
+    Status{{code}}({{#isEnum}}{{{enumName}}}{{/isEnum}}{{^isEnum}}{{{dataType}}}{{/isEnum}}),
+    {{/is3xx}}
+    {{/responses}}
+    UnknownValue(serde_json::Value),
+}
+
+{{/operation}}
+{{/operations}}
+{{/supportMultipleResponses}}
+{{#operations}}
+{{#operation}}
+/// struct for typed errors of method [`{{operationId}}`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum {{{operationIdCamelCase}}}Error {
+    {{#responses}}
+    {{#is4xx}}
+    Status{{code}}({{#isEnum}}{{{enumName}}}{{/isEnum}}{{^isEnum}}{{{dataType}}}{{/isEnum}}),
+    {{/is4xx}}
+    {{#is5xx}}
+    Status{{code}}({{#isEnum}}{{{enumName}}}{{/isEnum}}{{^isEnum}}{{{dataType}}}{{/isEnum}}),
+    {{/is5xx}}
+    {{#isDefault}}
+    DefaultResponse({{#isEnum}}{{{enumName}}}{{/isEnum}}{{^isEnum}}{{{dataType}}}{{/isEnum}}),
+    {{/isDefault}}
+    {{/responses}}
+    UnknownValue(serde_json::Value),
+}
+
+{{/operation}}
+{{/operations}}
+
+{{#operations}}
+{{#operation}}
+{{#description}}
+/// {{{.}}}
+{{/description}}
+{{#notes}}
+/// {{{.}}}
+{{/notes}}
+{{#isDeprecated}}
+#[deprecated]
+{{/isDeprecated}}
+{{#vendorExtensions.x-group-parameters}}
+pub {{#supportAsync}}async {{/supportAsync}}fn {{{operationId}}}{{#vendorExtensions.x-regions-generic-type-parameters}}{{#-first}}<{{/-first}}{{{.}}}{{^-last}}, {{/-last}}{{#-last}}>{{/-last}}{{/vendorExtensions.x-regions-generic-type-parameters}}(configuration: &mut configuration::Configuration<'client, T, D>{{#allParams}}{{#-first}},
+rx_buf: &'client mut [u8; configuration::RX_BUF_SIZE], {{!
+### Params
+}}params: {{{operationIdCamelCase}}}Params{{/-first}}{{/allParams}}{{!
+### Function return type
+}}) -> Result<{{!
+### Response File Support
+}}{{#isResponseFile}}reqwless::Response{{/isResponseFile}}{{!
+### Regular Responses
+}}{{^isResponseFile}}{{!
+### Multi response support
+}}{{#supportMultipleResponses}}ResponseContent<{{{operationIdCamelCase}}}Success>{{/supportMultipleResponses}}{{!
+### Regular return type
+}}{{^supportMultipleResponses}}{{^returnType}}(){{/returnType}}{{{returnType}}}{{#vendorExtensions.x-regions-response-lifetimes}}{{#-first}}<{{/-first}}'{{{.}}}{{^-last}}, {{/-last}}{{#-last}}>{{/-last}}{{/vendorExtensions.x-regions-response-lifetimes}}{{/supportMultipleResponses}}{{/isResponseFile}}{{!
+### Error Type
+}}, Error<'client, {{{operationIdCamelCase}}}Error>>
+where
+    T: 'client + TcpConnect, D: 'client + Dns{{#vendorExtensions.x-regions-trait-bounds}}{{#-first}},
+    {{/-first}}{{{.}}}{{^-last}}, {{/-last}}{{/vendorExtensions.x-regions-trait-bounds}}
+{
+{{/vendorExtensions.x-group-parameters}}
+{{^vendorExtensions.x-group-parameters}}
+pub {{#supportAsync}}async {{/supportAsync}}fn {{{operationId}}}{{#vendorExtensions.x-regions-generic-type-parameters}}{{#-first}}<{{/-first}}{{{.}}}{{^-last}}, {{/-last}}{{#-last}}>{{/-last}}{{/vendorExtensions.x-regions-generic-type-parameters}}(configuration: &mut configuration::Configuration<'client, T, D>,
+rx_buf: &'client mut [u8; configuration::RX_BUF_SIZE], {{#allParams}}{{{paramName}}}: {{!
+### Option Start
+}}{{^required}}Option<{{/required}}{{#required}}{{#isNullable}}Option<{{/isNullable}}{{/required}}{{!
+### &str and Vec<&str>
+}}{{#isString}}{{#isArray}}Vec<{{/isArray}}{{^isUuid}}&str{{/isUuid}}{{#isArray}}>{{/isArray}}{{/isString}}{{!
+### UUIDs
+}}{{#isUuid}}{{#isArray}}Vec<{{/isArray}}&str{{#isArray}}>{{/isArray}}{{/isUuid}}{{!
+### Models and primative types
+}}{{^isString}}{{^isUuid}}{{^isPrimitiveType}}{{^isContainer}}models::{{/isContainer}}{{/isPrimitiveType}}{{{dataType}}}{{^isPrimitiveType}}{{#vendorExtensions.x-regions-lifetimes}}{{#-first}}<{{/-first}}'{{{.}}}{{^-last}}, {{/-last}}{{#-last}}>{{/-last}}{{/vendorExtensions.x-regions-lifetimes}}{{^isContainer}}{{/isContainer}}{{/isPrimitiveType}}{{/isUuid}}{{/isString}}{{!
+### Option End
+}}{{^required}}>{{/required}}{{#required}}{{#isNullable}}>{{/isNullable}}{{/required}}{{!
+### Comma for next arguement
+}}{{^-last}}, {{/-last}}{{/allParams}}{{!
+### Function return type
+}}) -> Result<{{!
+### Response File Support
+}}{{#isResponseFile}}reqwless::Response{{/isResponseFile}}{{!
+### Regular Responses
+}}{{^isResponseFile}}{{!
+### Multi response support
+}}{{#supportMultipleResponses}}ResponseContent<{{{operationIdCamelCase}}}Success>{{/supportMultipleResponses}}{{!
+### Regular return type
+### TODO: We should move some of this logic into the Java code
+### It's going to get really complicated as mustache
+### Although the scala-http4s-sever api.mustache template has some
+### similar code
+}}{{^supportMultipleResponses}}{{^returnType}}(){{/returnType}}{{#returnContainer}}{{#isArray}}Vec{{/isArray}}<{{/returnContainer}}{{#returnType}}models::{{/returnType}}{{{returnBaseType}}}{{#vendorExtensions.x-regions-response-lifetimes}}{{#-first}}<{{/-first}}'{{{.}}}{{^-last}}, {{/-last}}{{#-last}}>{{/-last}}{{/vendorExtensions.x-regions-response-lifetimes}}{{#returnContainer}}{{#useNoStd}}, 256{{/useNoStd}}>{{/returnContainer}}{{/supportMultipleResponses}}{{/isResponseFile}}{{!
+### Error Type
+}}, Error<'client, {{{operationIdCamelCase}}}Error>>
+where
+    T: 'client + TcpConnect, D: 'client + Dns{{#vendorExtensions.x-regions-trait-bounds}}{{#-first}},
+    {{/-first}}{{{.}}}{{^-last}}, {{/-last}}{{/vendorExtensions.x-regions-trait-bounds}}
+{
+    {{#allParams.0}}
+    // add a prefix to parameters to efficiently prevent name collisions
+    {{/allParams.0}}
+    {{#allParams}}
+    let {{{vendorExtensions.x-rust-param-identifier}}} = {{{paramName}}};
+    {{/allParams}}
+{{/vendorExtensions.x-group-parameters}}
+
+    {{^useNoStd}}
+    let uri_str = format!("{}{{{path}}}", configuration.base_path{{#pathParams}}, {{{baseName}}}={{#isString}}crate::apis::urlencode({{/isString}}{{{vendorExtensions.x-rust-param-identifier}}}{{^required}}.unwrap(){{/required}}{{#required}}{{#isNullable}}.unwrap(){{/isNullable}}{{/required}}{{#isArray}}.join(",").as_ref(){{/isArray}}{{^isString}}{{^isUuid}}{{^isPrimitiveType}}{{^isContainer}}.to_string(){{/isContainer}}{{/isPrimitiveType}}{{/isUuid}}{{/isString}}{{#isString}}){{/isString}}{{/pathParams}});
+    {{/useNoStd}}
+    {{#useNoStd}}
+    // TODO: Fix this
+    // The base_path + length of path and three slashes +
+    // maximum length of an i32 in base10
+    // Of course, somebody will come along and change it to a u64
+    // And this should be pre-calculated
+    // TODO: This length is wrong, because there may be format
+    // parameters in the path.
+    let len = configuration.base_path.len() + "{{{path}}}".len() + 10;
+    let err_str: String<100> = String::try_from("URL is too long")?;
+    if len > 2048 {
+	// return Err(Error::Configuration(core::str::from_utf8("URL is too long")?));
+	return Err(Error::Configuration(err_str));
+    }
+    // RFC 2616 says a URI can be any length (Section 3.2.1 General
+    // Syntax)
+    // But we just can't support that on constrained memory
+    // devices. So 2048 it is.
+    // That's actually not that long in a UTF-8/UTF-32 world, with a max
+    // of four-bytes per character, that's 512 characters.
+    // I could increase it to 4096 or 8192.
+    let uri_str: String<2048> = format!("{}{{{path}}}", configuration.base_path{{#pathParams}}, {{{baseName}}}={{#isString}}crate::apis::urlencode({{/isString}}{{{vendorExtensions.x-rust-param-identifier}}}{{^required}}.unwrap(){{/required}}{{#required}}{{#isNullable}}.unwrap(){{/isNullable}}{{/required}}{{#isArray}}.join(",").as_ref(){{/isArray}}{{^isString}}{{^isUuid}}{{^isPrimitiveType}}{{^isContainer}}.to_string(){{/isContainer}}{{/isPrimitiveType}}{{/isUuid}}{{/isString}}{{#isString}}){{/isString}}{{/pathParams}})?;
+    {{/useNoStd}}
+
+    let mut req_builder = configuration.client
+        .request(reqwless::request::Method::{{{httpMethod}}}, &uri_str)
+        .await
+        .unwrap()
+        .content_type(ContentType::Json.into());
+
+    {{#queryParams}}
+    {{#required}}
+    {{#isArray}}
+    req_builder = match "{{collectionFormat}}" {
+        "multi" => req_builder.query(&{{{vendorExtensions.x-rust-param-identifier}}}.into_iter().map(|p| ("{{{baseName}}}".to_owned(), p.to_string())).collect::<Vec<(std::string::String, std::string::String)>>()),
+        _ => req_builder.query(&[("{{{baseName}}}", &{{{vendorExtensions.x-rust-param-identifier}}}.into_iter().map(|p| p.to_string()).collect::<Vec<String>>().join(",").to_string())]),
+    };
+    {{/isArray}}
+    {{^isArray}}
+    {{^isNullable}}
+    req_builder = req_builder.query(&[("{{{baseName}}}", &{{{vendorExtensions.x-rust-param-identifier}}}.to_string())]);
+    {{/isNullable}}
+    {{#isNullable}}
+    {{#isDeepObject}}
+    if let Some(ref param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+        {{^isExplode}}
+        let params = crate::apis::parse_deep_object("{{{baseName}}}", &serde_json::to_value(param_value)?);
+        req_builder = req_builder.query(&params);
+        {{/isExplode}}
+        {{#isExplode}}
+        {{#isModel}}
+        req_builder = req_builder.query(&param_value);
+        {{/isModel}}
+        {{#isMap}}
+        let mut query_params = Vec::with_capacity(param_value.len());
+        for (key, value) in param_value.iter() {
+            query_params.push((key.to_string(), serde_json::to_string(value)?));
+        }
+        req_builder = req_builder.query(&query_params);
+        {{/isMap}}
+        {{/isExplode}}
+    };
+    {{/isDeepObject}}
+    {{^isDeepObject}}
+    {{#isObject}}
+    if let Some(ref param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+        req_builder = req_builder.query(&[("{{{baseName}}}", &serde_json::to_string(param_value)?)]);
+    };
+    {{/isObject}}
+    {{#isModel}}
+    if let Some(ref param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+        req_builder = req_builder.query(&[("{{{baseName}}}", &serde_json::to_string(param_value)?)]);
+    };
+    {{/isModel}}
+    {{/isDeepObject}}
+    {{^isObject}}
+    {{^isModel}}
+    if let Some(ref param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+        req_builder = req_builder.query(&[("{{{baseName}}}", &param_value.to_string())]);
+    };
+    {{/isModel}}
+    {{/isObject}}
+    {{/isNullable}}
+    {{/isArray}}
+    {{/required}}
+    {{^required}}
+    if let Some(ref param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+        {{#isArray}}
+        req_builder = match "{{collectionFormat}}" {
+            "multi" => req_builder.query(&param_value.into_iter().map(|p| ("{{{baseName}}}".to_owned(), p.to_string())).collect::<Vec<(std::string::String, std::string::String)>>()),
+            _ => req_builder.query(&[("{{{baseName}}}", &param_value.into_iter().map(|p| p.to_string()).collect::<Vec<String>>().join(",").to_string())]),
+        };
+        {{/isArray}}
+        {{^isArray}}
+        {{#isDeepObject}}
+        {{^isExplode}}
+        let params = crate::apis::parse_deep_object("{{{baseName}}}", &serde_json::to_value(param_value)?);
+        req_builder = req_builder.query(&params);
+        {{/isExplode}}
+        {{#isExplode}}
+        {{#isModel}}
+        req_builder = req_builder.query(&param_value);
+        {{/isModel}}
+        {{#isMap}}
+        let mut query_params = Vec::with_capacity(param_value.len());
+        for (key, value) in param_value.iter() {
+            query_params.push((key.to_string(), serde_json::to_string(value)?));
+        }
+        req_builder = req_builder.query(&query_params);
+        {{/isMap}}
+        {{/isExplode}}
+        {{/isDeepObject}}
+        {{^isDeepObject}}
+        {{#isObject}}
+        req_builder = req_builder.query(&[("{{{baseName}}}", &serde_json::to_string(param_value)?)]);
+        {{/isObject}}
+        {{#isModel}}
+        req_builder = req_builder.query(&[("{{{baseName}}}", &serde_json::to_string(param_value)?)]);
+        {{/isModel}}
+        {{^isObject}}
+        {{^isModel}}
+        req_builder = req_builder.query(&[("{{{baseName}}}", &param_value.to_string())]);
+        {{/isModel}}
+        {{/isObject}}
+        {{/isDeepObject}}
+        {{/isArray}}
+    }
+    {{/required}}
+    {{/queryParams}}
+    {{#hasAuthMethods}}
+    {{#authMethods}}
+    {{#isApiKey}}
+    {{#isKeyInQuery}}
+    if let Some(ref apikey) = configuration.api_key {
+        let key = apikey.key.clone();
+        let value = match apikey.prefix {
+            Some(ref prefix) => format!("{} {}", prefix, key),
+            None => key,
+        };
+        req_builder = req_builder.query(&[("{{{keyParamName}}}", value)]);
+    }
+    {{/isKeyInQuery}}
+    {{/isApiKey}}
+    {{/authMethods}}
+    {{/hasAuthMethods}}
+    {{#hasAuthMethods}}
+    {{#withAWSV4Signature}}
+    if let Some(ref aws_v4_key) = configuration.aws_v4_key {
+        let new_headers = match aws_v4_key.sign(
+	    &uri_str,
+	    "{{{httpMethod}}}",
+	    {{#hasBodyParam}}
+	    {{#bodyParams}}
+	    &serde_json::to_string(&{{{vendorExtensions.x-rust-param-identifier}}}).expect("param should serialize to string"),
+	    {{/bodyParams}}
+	    {{/hasBodyParam}}
+	    {{^hasBodyParam}}
+	    "",
+	    {{/hasBodyParam}}
+	    ) {
+	      Ok(new_headers) => new_headers,
+	      Err(err) => return Err(Error::AWSV4SignatureError(err)),
+	    };
+	for (name, value) in new_headers.iter() {
+	    req_builder = req_builder.header(name.as_str(), value.as_str());
+	}
+    }
+    {{/withAWSV4Signature}}
+    {{/hasAuthMethods}}
+    // TODO: Implement this
+    // if let Some(ref user_agent) = configuration.user_agent {
+    //     req_builder = req_builder.header(reqwless::headers::USER_AGENT, user_agent.clone());
+    // }
+    {{#hasHeaderParams}}
+    {{#headerParams}}
+    {{#required}}
+    {{^isNullable}}
+    // TODO: Implement this
+    // req_builder = req_builder.header("{{{baseName}}}", {{{vendorExtensions.x-rust-param-identifier}}}{{#isArray}}.join(","){{/isArray}}.to_string());
+    {{/isNullable}}
+    {{#isNullable}}
+    match {{{vendorExtensions.x-rust-param-identifier}}} {
+        Some(param_value) => { req_builder = req_builder.header("{{{baseName}}}", param_value{{#isArray}}.join(","){{/isArray}}.to_string()); },
+        None => { req_builder = req_builder.header("{{{baseName}}}", ""); },
+    }
+    {{/isNullable}}
+    {{/required}}
+    {{^required}}
+    if let Some(param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+        req_builder = req_builder.header("{{{baseName}}}", param_value{{#isArray}}.join(","){{/isArray}}.to_string());
+    }
+    {{/required}}
+    {{/headerParams}}
+    {{/hasHeaderParams}}
+    {{#hasAuthMethods}}
+    {{#authMethods}}
+    {{#supportTokenSource}}
+    // Obtain a token from source provider.
+    // Tokens can be Id or access tokens depending on the provider type and configuration.
+    let token = configuration.token_source.token().await.map_err(Error::TokenSource)?;
+    // The token format is the responsibility of the provider, thus we just set the authorization header with whatever is given.
+    req_builder = req_builder.header(reqwless::headers::AUTHORIZATION, token);
+    {{/supportTokenSource}}
+    {{^supportTokenSource}}
+    {{#isApiKey}}
+    {{#isKeyInHeader}}
+    if let Some(ref apikey) = configuration.api_key {
+        let key = apikey.key.clone();
+        let value = match apikey.prefix {
+            Some(ref prefix) => format!("{} {}", prefix, key),
+            None => key,
+        };
+        req_builder = req_builder.header("{{{keyParamName}}}", value);
+    };
+    {{/isKeyInHeader}}
+    {{/isApiKey}}
+    {{#isBasic}}
+    {{#isBasicBasic}}
+    // TODO: Fix this up
+    #[allow(unused_mut)]
+    let mut user;
+    #[allow(unused_mut)]
+    let mut password;
+    if let Some(ref auth_conf) = configuration.basic_auth {
+        user = auth_conf.0;
+        password = auth_conf.1.as_ref().unwrap();
+        req_builder = req_builder.basic_auth(&user, &password);
+    };
+    {{/isBasicBasic}}
+    {{#isBasicBearer}}
+    let mut tok;
+    if let Some(ref token) = configuration.bearer_access_token {
+        tok = token;
+        req_builder = req_builder.bearer_auth(tok);
+    };
+    {{/isBasicBearer}}
+    {{/isBasic}}
+    {{#isOAuth}}
+    let mut tok;
+    if let Some(ref token) = configuration.oauth_access_token {
+        tok = token;
+        req_builder = req_builder.bearer_auth(tok);
+    };
+    {{/isOAuth}}
+    {{/supportTokenSource}}
+    {{/authMethods}}
+    {{/hasAuthMethods}}
+    {{#isMultipart}}
+    {{#hasFormParams}}
+    let mut multipart_form = reqwless::multipart::Form::new();
+    {{#formParams}}
+    {{#isFile}}
+    {{^supportAsync}}
+    {{#required}}
+    {{^isNullable}}
+    multipart_form = multipart_form.file("{{{baseName}}}", {{{vendorExtensions.x-rust-param-identifier}}})?;
+    {{/isNullable}}
+    {{#isNullable}}
+    match {{{vendorExtensions.x-rust-param-identifier}}} {
+        Some(param_value) => { multipart_form = multipart_form.file("{{{baseName}}}", param_value)?; },
+        None => { unimplemented!("Required nullable form file param not supported"); },
+    }
+    {{/isNullable}}
+    {{/required}}
+    {{^required}}
+    if let Some(param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+        multipart_form = multipart_form.file("{{{baseName}}}", param_value)?;
+    }
+    {{/required}}
+    {{/supportAsync}}
+    {{#supportAsync}}
+    // TODO: support file upload for '{{{baseName}}}' parameter
+    {{/supportAsync}}
+    {{/isFile}}
+    {{^isFile}}
+    {{#required}}
+    {{^isNullable}}
+    multipart_form = multipart_form.text("{{{baseName}}}", {{{vendorExtensions.x-rust-param-identifier}}}{{#isArray}}.into_iter().map(|p| p.to_string()).collect::<Vec<String>>().join(","){{/isArray}}.to_string());
+    {{/isNullable}}
+    {{#isNullable}}
+    match {{{vendorExtensions.x-rust-param-identifier}}} {
+        Some(param_value) => { multipart_form = multipart_form.text("{{{baseName}}}", param_value{{#isArray}}.into_iter().map(|p| p.to_string()).collect::<Vec<String>>().join(","){{/isArray}}.to_string()); },
+        None => { multipart_form = multipart_form.text("{{{baseName}}}", ""); },
+    }
+    {{/isNullable}}
+    {{/required}}
+    {{^required}}
+    if let Some(param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+        multipart_form = multipart_form.text("{{{baseName}}}", param_value{{#isArray}}.into_iter().map(|p| p.to_string()).collect::<Vec<String>>().join(","){{/isArray}}.to_string());
+    }
+    {{/required}}
+    {{/isFile}}
+    {{/formParams}}
+    req_builder = req_builder.multipart(multipart_form);
+    {{/hasFormParams}}
+    {{/isMultipart}}
+    {{^isMultipart}}
+    {{#hasFormParams}}
+    let mut multipart_form_params = std::collections::HashMap::new();
+    {{#formParams}}
+    {{#isFile}}
+    {{#required}}
+    {{^isNullable}}
+    multipart_form_params.insert("{{{baseName}}}", unimplemented!("File form param not supported with x-www-form-urlencoded content"));
+    {{/isNullable}}
+    {{#isNullable}}
+    match {{{vendorExtensions.x-rust-param-identifier}}} {
+        Some(param_value) => { multipart_form_params.insert("{{{baseName}}}", unimplemented!("File form param not supported with x-www-form-urlencoded content")); },
+        None => { unimplemented!("Required nullable file form param not supported with x-www-form-urlencoded content"); },
+    }
+    {{/isNullable}}
+    {{/required}}
+    {{^required}}
+    if let Some(param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+        multipart_form_params.insert("{{{baseName}}}", unimplemented!("File form param not supported with x-www-form-urlencoded content"));
+    }
+    {{/required}}
+    {{/isFile}}
+    {{^isFile}}
+    {{#required}}
+    {{^isNullable}}
+    multipart_form_params.insert("{{{baseName}}}", {{{vendorExtensions.x-rust-param-identifier}}}{{#isArray}}.into_iter().map(|p| p.to_string()).collect::<Vec<String>>().join(","){{/isArray}}.to_string());
+    {{/isNullable}}
+    {{#isNullable}}
+    match {{{vendorExtensions.x-rust-param-identifier}}} {
+        Some(param_value) => { multipart_form_params.insert("{{{baseName}}}", param_value{{#isArray}}.into_iter().map(|p| p.to_string()).collect::<Vec<String>>().join(","){{/isArray}}.to_string()); },
+        None => { multipart_form_params.insert("{{{baseName}}}", ""); },
+    }
+    {{/isNullable}}
+    {{/required}}
+    {{^required}}
+    if let Some(param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+        multipart_form_params.insert("{{{baseName}}}", param_value{{#isArray}}.into_iter().map(|p| p.to_string()).collect::<Vec<String>>().join(","){{/isArray}}.to_string());
+    }
+    {{/required}}
+    {{/isFile}}
+    {{/formParams}}
+    req_builder = req_builder.form(&multipart_form_params);
+    {{/hasFormParams}}
+    {{/isMultipart}}
+    {{#hasBodyParam}}
+    {{#bodyParams}}
+    {{#isFile}}
+    {{#supportAsync}}
+    {{#required}}
+    // TODO: Implement this
+    // let file = TokioFile::open({{{vendorExtensions.x-rust-param-identifier}}}).await?;
+    // let stream = FramedRead::new(file, BytesCodec::new());
+    // req_builder = req_builder.body(reqwless::Body::wrap_stream(stream));
+    {{/required}}
+    {{^required}}
+    // TODO: Implement this
+    // if let Some(param_value) = {{{vendorExtensions.x-rust-param-identifier}}} {
+    //     let file = TokioFile::open(param_value).await?;
+    //     let stream = FramedRead::new(file, BytesCodec::new());
+    //     req_builder = req_builder.body(reqwless::Body::wrap_stream(stream));
+    // }
+    {{/required}}
+    {{/supportAsync}}
+    {{^supportAsync}}
+    req_builder = req_builder.body({{{vendorExtensions.x-rust-param-identifier}}});
+    {{/supportAsync}}
+    {{/isFile}}
+    {{^isFile}}
+    // TODO: I can't get this working, fix it
+    // I could make a fork of reqwless that has the json ResponseBuilder method
+    // I could also get byte slices working in serde_json
+    // old:
+    // req_builder = req_builder.json(&{{{vendorExtensions.x-rust-param-identifier}}});
+    {{/isFile}}
+    {{/bodyParams}}
+    {{/hasBodyParam}}
+
+    let resp = req_builder
+	.send(rx_buf)
+        .await
+        .unwrap();
+
+    let status = resp.status;
+    {{^supportMultipleResponses}}
+    {{^isResponseFile}}
+    {{#returnType}}
+    // TODO: Fix the content_type move issue
+
+    // let content_type = resp
+    //     .headers()
+    //     .get("content-type")
+    //     .and_then(|v| v.to_str().ok())
+    //     .unwrap_or("application/octet-stream");
+    // let content_type = super::ContentType::from(content_type);
+    {{/returnType}}
+    {{/isResponseFile}}
+    {{/supportMultipleResponses}}
+
+    if !status.is_client_error() && !status.is_server_error() {
+        {{^supportMultipleResponses}}
+        {{#isResponseFile}}
+        Ok(resp)
+        {{/isResponseFile}}
+        {{^isResponseFile}}
+        {{^returnType}}
+        Ok(())
+        {{/returnType}}
+        {{#returnType}}
+	let content = str::from_utf8(resp.body().read_to_end().await?).unwrap();
+        // let content = resp.text(){{#supportAsync}}.await{{/supportAsync}}?;
+	serde_json::from_str(&content).map_err(Error::from)
+
+        // TODO: This match isn't working, we need to fix it up and
+        // remove the line above
+
+        // match content_type {
+        //     {{^useSerdePathToError}}
+        //     ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
+        //     {{/useSerdePathToError}}
+        //     {{#useSerdePathToError}}
+        //     ContentType::Json => serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(&content)).map_err(Error::from),
+        //     {{/useSerdePathToError}}
+        //     {{#vendorExtensions.x-supports-plain-text}}
+        //     ContentType::Text => return Ok(content),
+        //     {{/vendorExtensions.x-supports-plain-text}}
+        //     {{^vendorExtensions.x-supports-plain-text}}
+        //     ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `{{returnType}}`"))),
+        //     {{/vendorExtensions.x-supports-plain-text}}
+        //     ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `{{returnType}}`")))),
+        // }
+        {{/returnType}}
+        {{/isResponseFile}}
+        {{/supportMultipleResponses}}
+        {{#supportMultipleResponses}}
+        {{#isResponseFile}}
+        Ok(resp)
+        {{/isResponseFile}}
+        {{^isResponseFile}}
+        let content = resp.text(){{#supportAsync}}.await{{/supportAsync}}?;
+        let entity: Option<{{{operationIdCamelCase}}}Success> = serde_json::from_str(&content).ok();
+        Ok(ResponseContent { status, content, entity })
+        {{/isResponseFile}}
+        {{/supportMultipleResponses}}
+    } else {
+	let content = str::from_utf8(resp.body().read_to_end().await?).unwrap();
+        // let content = resp.text(){{#supportAsync}}.await{{/supportAsync}}?;
+        let entity: Option<{{{operationIdCamelCase}}}Error> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+{{/operation}}
+{{/operations}}

@@ -17,12 +17,15 @@
 
 package org.openapitools.codegen.languages;
 
+import org.apache.commons.lang3.BooleanUtils;
 import com.google.common.collect.ImmutableMap;
 import com.samskivert.mustache.Mustache;
 import com.samskivert.mustache.Mustache.Lambda;
 import com.samskivert.mustache.Template;
+import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.media.Discriminator;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.parser.util.SchemaTypeUtil;
 import joptsimple.internal.Strings;
 import lombok.AccessLevel;
@@ -60,6 +63,10 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
     @Setter private boolean bestFitInt = false;
     @Setter private boolean avoidBoxedModels = false;
     private List<String> reqwestDefaultFeatures = Arrays.asList("native-tls");
+    // Unlike reqwest, reqwless has embedded-tls as a default feature already
+    // We will still specify it here for documentation and so we
+    // aren't surprised by changes in the future.
+    private List<String> reqwlessDefaultFeatures = Arrays.asList("embedded-tls");
 
     public static final String PACKAGE_NAME = "packageName";
     public static final String EXTERN_CRATE_NAME = "externCrateName";
@@ -69,6 +76,7 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
     public static final String REQWEST_LIBRARY = "reqwest";
     public static final String REQWEST_TRAIT_LIBRARY = "reqwest-trait";
     public static final String REQWEST_TRAIT_LIBRARY_ATTR = "reqwestTrait";
+    public static final String REQWLESS_LIBRARY = "reqwless";
     public static final String SUPPORT_ASYNC = "supportAsync";
     public static final String SUPPORT_MIDDLEWARE = "supportMiddleware";
     public static final String USE_SERDE_PATH_TO_ERROR = "useSerdePathToError";
@@ -81,6 +89,12 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
     public static final String MOCKALL = "mockall";
     public static final String BON_BUILDER = "useBonBuilder";
     public static final String REQWEST_DEFAULT_FEATURES = "reqwestDefaultFeatures";
+    public static final String REQWLESS_DEFAULT_FEATURES = "reqwlessDefaultFeatures";
+
+    // Whether the library (sub-template) uses std or doesn't
+    // This should be false for most of the sub-templates,
+    // but true for reqwless and other embedded libraries.
+    public static final String USE_NO_STD = "useNoStd";
 
     @Setter protected String packageName = "openapi";
     @Setter protected String packageVersion = "1.0.0";
@@ -91,6 +105,8 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
     // The API has at least one UUID type.
     // If the API does not contain any UUIDs we do not need depend on the `uuid` crate
     private boolean hasUUIDs = false;
+
+    private boolean rustNoStd = false;
 
     @Override
     public CodegenType getTag() {
@@ -167,8 +183,17 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
         );
 
         instantiationTypes.clear();
-        /*instantiationTypes.put("array", "GoArray");
-        instantiationTypes.put("map", "GoMap");*/
+
+        String xRustNoStd = "x-rust-no-std";
+	String xRustNoStdValue = "false";
+
+	if (this.vendorExtensions().containsValue(xRustNoStd)) {
+	    xRustNoStdValue = this.vendorExtensions().get(xRustNoStd).toString();
+	}
+
+	// this.additionalProperties.put("x-rust-no-std", rustNoStd);
+	// this.additionalProperties.put("x-rust-no-std", xRustNoStdValue);
+	this.additionalProperties.put("x-rust-no-std-client-this-additional-properties", xRustNoStdValue);
 
         typeMapping.clear();
         typeMapping.put("integer", "i32");
@@ -177,7 +202,7 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
         typeMapping.put("float", "f32");
         typeMapping.put("double", "f64");
         typeMapping.put("boolean", "bool");
-        typeMapping.put("string", "String");
+	typeMapping.put("string", "String");
         typeMapping.put("array", "Vec");
         typeMapping.put("map", "std::collections::HashMap");
         typeMapping.put("UUID", "uuid::Uuid");
@@ -235,11 +260,16 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
                 .defaultValue(Boolean.FALSE.toString()));
         cliOptions.add(new CliOption(REQWEST_DEFAULT_FEATURES, "Default features for the reqwest dependency (comma-separated). Use empty for no defaults. This option is for 'reqwest' and 'reqwest-trait' library only.")
                 .defaultValue("native-tls"));
+        cliOptions.add(new CliOption(REQWLESS_DEFAULT_FEATURES, "Default features for the reqwless dependency (comma-separated). Use empty for no defaults. This option is for 'reqwless' library only.")
+                .defaultValue("embedded-tls"));
+        cliOptions.add(new CliOption(USE_NO_STD, "If set, use #![no_std]. By default use the standard library. This option is for libraries like 'reqwless' that target embedded devices.", SchemaTypeUtil.BOOLEAN_TYPE)
+                .defaultValue(Boolean.FALSE.toString()));
 
         supportedLibraries.put(HYPER_LIBRARY, "HTTP client: Hyper (v1.x).");
         supportedLibraries.put(HYPER0X_LIBRARY, "HTTP client: Hyper (v0.x).");
         supportedLibraries.put(REQWEST_LIBRARY, "HTTP client: Reqwest.");
         supportedLibraries.put(REQWEST_TRAIT_LIBRARY, "HTTP client: Reqwest (trait based).");
+        supportedLibraries.put(REQWLESS_LIBRARY, "HTTP client: Reqwless.");
 
 
         CliOption libraryOption = new CliOption(CodegenConstants.LIBRARY, "library template (sub-template) to use.");
@@ -498,6 +528,21 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
         }
         additionalProperties.put(REQWEST_DEFAULT_FEATURES, reqwestDefaultFeatures);
 
+        if (additionalProperties.containsKey(REQWLESS_DEFAULT_FEATURES)) {
+            Object value = additionalProperties.get(REQWLESS_DEFAULT_FEATURES);
+            if (value instanceof List) {
+                reqwlessDefaultFeatures = (List<String>) value;
+            } else if (value instanceof String) {
+                String str = (String) value;
+                if (str.isEmpty()) {
+                    reqwlessDefaultFeatures = new ArrayList<>();
+                } else {
+                    reqwlessDefaultFeatures = Arrays.asList(str.split(",\\s*"));
+                }
+            }
+        }
+        additionalProperties.put(REQWLESS_DEFAULT_FEATURES, reqwlessDefaultFeatures);
+
         additionalProperties.put(CodegenConstants.PACKAGE_NAME, packageName);
         additionalProperties.put(CodegenConstants.PACKAGE_VERSION, packageVersion);
         additionalProperties.put(EXTERN_CRATE_NAME, getExternCrateName());
@@ -514,9 +559,36 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
             additionalProperties.put(REQWEST_LIBRARY, "true");
         } else if (REQWEST_TRAIT_LIBRARY.equals(getLibrary())) {
             additionalProperties.put(REQWEST_TRAIT_LIBRARY_ATTR, "true");
+        } else if (REQWLESS_LIBRARY.equals(getLibrary())) {
+            additionalProperties.put(REQWLESS_LIBRARY, "true");
         } else {
             LOGGER.error("Unknown library option (-l/--library): {}", getLibrary());
         }
+ 
+	if (!additionalProperties.containsKey(USE_NO_STD)) {
+	    additionalProperties.put(USE_NO_STD, Boolean.FALSE);
+	}
+
+	// TODO: This needs to be looked at.
+	//
+	// We use heapless String in some places and str elsewhere
+	// We need to be more consistent in the usage.
+	// We also use both x-regions-is-reference in the models
+	// AND we test USE_NO_STD here to determine whether or not to use
+	// string slices.
+	//
+	// We should only need one, probably the
+	// x-regions-is-reference.
+	if ((additionalProperties.containsKey(USE_NO_STD) && Boolean.parseBoolean(additionalProperties.get(USE_NO_STD).toString()))
+	    || (additionalProperties.containsKey(REQWLESS_LIBRARY) && Boolean.parseBoolean(additionalProperties.get(REQWLESS_LIBRARY).toString()))) {
+	    typeMapping.put("string", "str");
+	    typeMapping.put("URI", "str");
+	    typeMapping.put("date", "str");
+	    typeMapping.put("DateTime", "str");
+	    typeMapping.put("password", "str");
+	    typeMapping.put("decimal", "str");
+	    typeMapping.put("ByteArray", "str");
+	}
 
         apiTemplateFiles.put(getLibrary() + "/api.mustache", ".rs");
 
@@ -807,6 +879,8 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
                 operation.httpMethod = StringUtils.camelize(operation.httpMethod.toLowerCase(Locale.ROOT));
             } else if (REQWEST_LIBRARY.equals(getLibrary()) || REQWEST_TRAIT_LIBRARY.equals(getLibrary())) {
                 operation.httpMethod = operation.httpMethod.toUpperCase(Locale.ROOT);
+            } else if (REQWLESS_LIBRARY.equals(getLibrary())) {
+                operation.httpMethod = operation.httpMethod.toUpperCase(Locale.ROOT);
             }
 
             // add support for single request parameter using x-group-parameters
@@ -937,5 +1011,40 @@ public class RustClientCodegen extends AbstractRustCodegen implements CodegenCon
     public static <K, V> boolean hasDuplicateValues(Map<K, V> map) {
         Set<V> uniqueValues = new HashSet<>(map.values());
         return uniqueValues.size() < map.size();
+    }
+
+
+    /**
+     * Set op's returnBaseType, returnType, examples etc.
+     *
+     * @param operation      endpoint Operation
+     * @param schemas        a map of the schemas in the openapi spec
+     * @param op             endpoint CodegenOperation
+     * @param methodResponse the default ApiResponse for the endpoint
+     * @param schemaMappings mappings of external types to be omitted by unaliasing
+     */
+    @Override
+    protected void handleMethodResponse(Operation operation,
+                                        Map<String, Schema> schemas,
+                                        CodegenOperation op,
+                                        ApiResponse methodResponse,
+                                        Map<String, String> schemaMappings) {
+
+	super.handleMethodResponse(operation, schemas, op, methodResponse, schemaMappings);
+
+        ApiResponse response = ModelUtils.getReferencedApiResponse(openAPI, methodResponse);
+
+	// Each specific response (200, 201, etc.) can have a set of
+	// lifetimes too.
+	//
+	// These lifetimes can be referenced with the vendor extension
+	// x-regions-response-lifetimes, this is the same as
+	// x-regions-lifetimes in the schema.
+	if (response.getExtensions() != null) {
+	    Map<String, Object> extensions = response.getExtensions();
+	    if (extensions.containsKey(VENDOR_EXTENSION_REGIONS_LIFETIMES)) {
+		op.vendorExtensions.put("x-regions-response-lifetimes",	extensions.get(VENDOR_EXTENSION_REGIONS_LIFETIMES));
+	    }
+	}
     }
 }

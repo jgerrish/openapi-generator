@@ -30,6 +30,7 @@ import io.swagger.v3.oas.models.servers.Server;
 import joptsimple.internal.Strings;
 import lombok.Setter;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.openapitools.codegen.*;
@@ -89,6 +90,9 @@ public class RustServerCodegen extends AbstractRustCodegen implements CodegenCon
 
     // Track if we have models with conflicting names (Ok/Err) that conflict with serde_valid
     private boolean hasConflictingModelNames = false;
+
+    // Rust no_std
+    private boolean rustNoStd = false;
 
     public RustServerCodegen() {
         super();
@@ -181,13 +185,28 @@ public class RustServerCodegen extends AbstractRustCodegen implements CodegenCon
         instantiationTypes.put("array", "Vec");
         instantiationTypes.put("map", "std::collections::HashMap");
 
+        String xRustNoStd = "x-rust-no-std";
+	String xRustNoStdValue = "false";
+
+	if (this.vendorExtensions().containsValue(xRustNoStd)) {
+	    xRustNoStdValue = this.vendorExtensions().get(xRustNoStd).toString();
+	}
+
+	// this.additionalProperties.put("x-rust-no-std", rustNoStd);
+	// this.additionalProperties.put("x-rust-no-std", xRustNoStdValue);
+	this.additionalProperties.put("x-rust-no-std-server-this-additional-properties", xRustNoStdValue);
+
         typeMapping.clear();
         typeMapping.put("number", "f64");
         typeMapping.put("integer", "i32");
         typeMapping.put("long", "i64");
         typeMapping.put("float", "f32");
         typeMapping.put("double", "f64");
-        typeMapping.put("string", "String");
+	if (xRustNoStdValue == "true") {
+	    typeMapping.put("string", "str");
+	} else {
+	    typeMapping.put("string", "String");
+	}
         typeMapping.put("UUID", uuidType);
         typeMapping.put("URI", "String");
         typeMapping.put("byte", "u8");

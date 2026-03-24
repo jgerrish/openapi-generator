@@ -22,6 +22,9 @@ public abstract class AbstractRustCodegen extends DefaultCodegen implements Code
     private final Logger LOGGER = LoggerFactory.getLogger(AbstractRustCodegen.class);
 
     protected static final String VENDOR_EXTENSION_PARAM_IDENTIFIER = "x-rust-param-identifier";
+    public static final String VENDOR_EXTENSION_REGIONS_LIFETIMES = "x-regions-lifetimes";
+    public static final String VENDOR_EXTENSION_REGIONS_IS_REFERENCE = "x-regions-is-reference";
+    public static final String VENDOR_EXTENSION_REGIONS_LIFETIME = "x-regions-lifetime";
 
     protected List<String> charactersToAllow = Collections.singletonList("_");
     protected Set<String> keywordsThatDoNotSupportRawIdentifiers = new HashSet<>(
@@ -273,6 +276,62 @@ public abstract class AbstractRustCodegen extends DefaultCodegen implements Code
 
         return "models::" + toModelName(oasType);
     }
+
+    // The following is commented out for now.  It was an initial
+    // attempt to put some of the logic for inner and outer types
+    // (e.g. an outer Array of inner models) into the Java code.
+    //
+    // But most of the logic was moved to the Mustache template code.
+    // We should have enough Mustache variables to handle the cases we
+    // need.
+    //
+    // There may be cases where more logic here is needed, but not
+    // yet.
+    //
+    // /**
+    //  * Return the instantiation type of the property, especially for map and array
+    //  *
+    //  * @param schema property schema
+    //  * @return string presentation of the instantiation type of the property
+    //  */
+    // public String toInstantiationType(CodegenModel model, Schema schema) {
+    //     if (ModelUtils.isMapSchema(schema)) {
+    //         Schema additionalProperties = ModelUtils.getAdditionalProperties(schema);
+    //         String inner = getSchemaType(additionalProperties);
+    //         String mapInstantiation = instantiationTypes.get("map");
+    //         if (mapInstantiation != null) {
+    //             return mapInstantiation + "<String, " + inner + ">";
+    //         }
+    //         return inner;
+    //     } else if (ModelUtils.isArraySchema(schema)) {
+    //         String inner = getSchemaType(ModelUtils.getSchemaItems(schema));
+    //         String parentType;
+    //         if (ModelUtils.isSet(schema)) {
+    //             parentType = "set";
+    //         } else {
+    //             parentType = "array";
+    //         }
+
+    // 	    String outer = instantiationTypes.get(parentType);
+    // 	    // Save the inner and outer types so we can attach
+    // 	    // lifetimes or other type parameters to them
+    // 	    // if (schema.getExtensions() == null) {
+    // 	    // 	schema.setExtensions(new HashMap<>());
+    // 	    // }
+    // 	    // Map<String, Object> vendorExtensions = schema.getExtensions();
+    // 	    model.vendorExtensions.put("x-array-outer-type", outer);
+    // 	    model.vendorExtensions.put("x-array-inner-type", inner);
+
+    //         return outer + "<" + inner + ">";
+    //     } else {
+    //         return null;
+    //     }
+    // }
+
+    // @Override
+    // protected void addParentFromContainer(CodegenModel model, Schema schema) {
+    //     model.parent = toInstantiationType(model, schema);
+    // }
 
     @Override
     public CodegenModel fromModel(String name, Schema model) {
